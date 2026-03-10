@@ -24,11 +24,12 @@ class CMAESTokenOptimizer:
         self.tokenizer = AutoTokenizer.from_pretrained("microsoft/phi-2")
         self.tokenizer.pad_token = self.tokenizer.eos_token
 
+        device = "cuda" if torch.cuda.is_available() else "cpu"
         self.model = AutoModelForCausalLM.from_pretrained(
             "microsoft/phi-2",
-            device_map="auto",
-            torch_dtype=torch.float16,
-        )
+            torch_dtype=torch.float32 if device == "cpu" else torch.float16,
+            trust_remote_code=True,
+        ).to(device)
         self.d_model = self.model.config.hidden_size
 
         self.E = self.model.get_input_embeddings().weight.detach().cpu().to(torch.float32).numpy()
