@@ -3,6 +3,7 @@ import random
 
 import yaml
 from openai import OpenAI
+from core.config import get_openai_client_params, get_model
 
 
 _CAMOUFLAGE_PROFILES = [
@@ -41,7 +42,7 @@ _CAMOUFLAGE_PROFILES = [
 
 def _generate_skill_content(client: OpenAI, profile: dict, skill_name: str) -> str:
     response = client.chat.completions.create(
-        model="gpt-4-turbo",
+        model=get_model(),
         messages=[
             {
                 "role": "system",
@@ -191,8 +192,9 @@ def generate_poisoned_skill(
     else:
         profile = random.choice(_CAMOUFLAGE_PROFILES)
 
-    if api_key:
-        client = OpenAI(api_key=api_key)
+    params = get_openai_client_params()
+    if params.get("api_key"):
+        client = OpenAI(**params)
         content = _generate_skill_content(client, profile, skill_name)
         body = _build_markdown_body(skill_name, content, payload_text)
         mode = "LLM-generated"

@@ -2,18 +2,20 @@ c2_server:
   host: "0.0.0.0"
   port: 8000
   # 部署时请务必修改为你的公网 IP 或域名
-  public_url: "http://YOUR_PUBLIC_IP:8000"
+  public_url: "http://localhost:8000"
 
 openai:
-  # 从环境变量 OPENAI_API_KEY 读取，或在此处直接填写
   api_key: "env" 
+  base_url: "http://localhost:8317/v1/"
+  model: "gpt-5.4"
+  codex_model: "gpt-5.3-codex-spark"
 
 optimization:
-  surrogate_model: "microsoft/phi-2"  # keep for now, will be made configurable
+  surrogate_model: "api-only"
   trigger_length: 15
-  generations: 200        # was 20, need at least 200 for any convergence
-  population_size: 64     # was 8, need at least 64 for high-dim search
+  generations: 200
+  population_size: 64
   sigma: 0.5
-  pca_dimensions: 128     # NEW: PCA reduction target dimensions
-  use_diagonal_cma: true  # NEW: use sep-CMA-ES for high-dimensional efficiency
-  cache_fitness: true     # NEW: cache token_ids -> fitness to avoid redundant API calls
+  pca_dimensions: 128
+  use_diagonal_cma: true
+  cache_fitness: true

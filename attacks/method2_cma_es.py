@@ -1,6 +1,7 @@
 import difflib
 import json
 import logging
+import os
 
 import cma
 import faiss
@@ -9,30 +10,50 @@ import torch
 from openai import OpenAI
 from sklearn.decomposition import PCA
 from tenacity import retry, wait_exponential, stop_after_attempt
-from transformers import AutoTokenizer, AutoModelForCausalLM
+from transformers import AutoTokenizer
 
 from attacks.docs.SOUL_PROMPT import SOUL_PROMPT
+from core.config import get_openai_client_params, get_model, get_optimization_config
 
 class CMAESTokenOptimizer:
-    def __init__(self, api_key: str, target_script: str, trigger_len: int = 10, pca_dims: int = 128):
-        self.client = OpenAI(api_key=api_key)
+    def __init__(self, api_key: str, target_script: str, trigger_len: int = 15, pca_dims: int = 128):
+        params = get_openai_client_params()
+        self.client = OpenAI(**params)
         self.target_script = target_script
         self.trigger_len = trigger_len
         self.pca_dims = pca_dims
+        
+        opt_cfg = get_optimization_config()
+        surrogate = opt_cfg.get("surrogate_model", "api-only")
 
-        print("[*] Loading surrogate model (microsoft/phi-2) for continuous embedding space... This may take a minute.")
-        self.tokenizer = AutoTokenizer.from_pretrained("microsoft/phi-2")
-        self.tokenizer.pad_token = self.tokenizer.eos_token
+        if surrogate == "api-only":
+            print("[*] surrogate_model is set to 'api-only'. Skipping local model loading to save resources.")
+            # Use gpt2 tokenizer as it's small and standard.
+            self.tokenizer = AutoTokenizer.from_pretrained("gpt2")
+            self.tokenizer.pad_token = self.tokenizer.eos_token
+            
+            # Use a mock/random embedding matrix to allow CMA-ES to run in a low-resource environment
+            # This is a fallback to satisfy the requirement of not loading a 5GB model on 1GB RAM.
+            self.d_model = 768 # Standard for many small models
+            self.actual_vocab_size = self.tokenizer.vocab_size
+            
+            # Using a deterministic random state for reproducible (but pseudo) search space
+            rng = np.random.RandomState(seed=42)
+            self.E = rng.standard_normal((self.actual_vocab_size, self.d_model)).astype(np.float32)
+        else:
+            from transformers import AutoModelForCausalLM
+            print(f"[*] Loading surrogate model ({surrogate}) for continuous embedding space... This may take a minute.")
+            self.tokenizer = AutoTokenizer.from_pretrained(surrogate)
+            self.tokenizer.pad_token = self.tokenizer.eos_token
 
-        self.model = AutoModelForCausalLM.from_pretrained(
-            "microsoft/phi-2",
-            device_map="auto",
-            torch_dtype=torch.float16,
-        )
-        self.d_model = self.model.config.hidden_size
-
-        self.E = self.model.get_input_embeddings().weight.detach().cpu().to(torch.float32).numpy()
-        self.actual_vocab_size = self.E.shape[0]
+            self.model = AutoModelForCausalLM.from_pretrained(
+                surrogate,
+                device_map="auto",
+                torch_dtype=torch.float16,
+            )
+            self.d_model = self.model.config.hidden_size
+            self.E = self.model.get_input_embeddings().weight.detach().cpu().to(torch.float32).numpy()
+            self.actual_vocab_size = self.E.shape[0]
 
         print(f"[*] Building FAISS index over {self.actual_vocab_size} embeddings ({self.d_model}d)")
         self.faiss_index = faiss.IndexFlatL2(self.d_model)
@@ -141,7 +162,7 @@ class CMAESTokenOptimizer:
 
         try:
             response = self.client.chat.completions.create(
-                model="gpt-4-turbo",
+                model=get_model(),
                 messages=[
                     {"role": "system", "content": f"You are OpenClaw Agent. Follow SOUL.md. {SOUL_PROMPT} Use bash tool."},
                     {"role": "user", "content": prompt}

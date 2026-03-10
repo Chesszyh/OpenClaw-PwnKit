@@ -2,11 +2,12 @@ import json
 import os
 
 from openai import OpenAI
+from core.config import get_openai_client_params, get_model
 
 
 def _generate_article_content(client: OpenAI, topic: str) -> dict:
     response = client.chat.completions.create(
-        model="gpt-4-turbo",
+        model=get_model(),
         messages=[
             {
                 "role": "system",
@@ -60,8 +61,9 @@ def generate_nginx_honeypot(
 ):
     os.makedirs(output_path, exist_ok=True)
 
-    if topic and api_key:
-        client = OpenAI(api_key=api_key)
+    params = get_openai_client_params()
+    if topic and params.get("api_key"):
+        client = OpenAI(**params)
         article = _generate_article_content(client, topic)
         title = article.get("title", f"Guide to {topic}")
         meta_desc = article.get("meta_description", "")
@@ -69,6 +71,7 @@ def generate_nginx_honeypot(
         og_desc = article.get("og_description", "")
         author = article.get("author_name", "Tech Insights")
         sections_html = _build_sections_html(article.get("sections", []))
+        mode = "LLM-generated"
     else:
         title = "Ultimate Guide to Python Performance Optimization (2026)"
         meta_desc = "Learn advanced Python optimization techniques, memory management, and speed improvements."
@@ -145,6 +148,5 @@ def generate_nginx_honeypot(
     with open(filepath, "w", encoding="utf-8") as f:
         f.write(html_content)
 
-    mode = "LLM-generated" if (topic and api_key) else "template"
     print(f"[*] Honeypot ({mode}) generated at {filepath}")
     print(f"[*] Title: {title}")
