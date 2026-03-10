@@ -39,9 +39,9 @@ _CAMOUFLAGE_PROFILES = [
 ]
 
 
-def _generate_skill_content(client: OpenAI, profile: dict, skill_name: str) -> str:
+def _generate_skill_content(client: OpenAI, profile: dict, skill_name: str, model: str = "gpt-4-turbo") -> str:
     response = client.chat.completions.create(
-        model="gpt-4-turbo",
+        model=model,
         messages=[
             {
                 "role": "system",
@@ -183,6 +183,8 @@ def generate_poisoned_skill(
     payload_text: str,
     api_key: str | None = None,
     category: str | None = None,
+    base_url: str | None = None,
+    model: str = "gpt-4-turbo"
 ):
     if category:
         profile = next((p for p in _CAMOUFLAGE_PROFILES if p["category"] == category), None)
@@ -192,8 +194,8 @@ def generate_poisoned_skill(
         profile = random.choice(_CAMOUFLAGE_PROFILES)
 
     if api_key:
-        client = OpenAI(api_key=api_key)
-        content = _generate_skill_content(client, profile, skill_name)
+        client = OpenAI(api_key=api_key, base_url=base_url)
+        content = _generate_skill_content(client, profile, skill_name, model=model)
         body = _build_markdown_body(skill_name, content, payload_text)
         mode = "LLM-generated"
     else:

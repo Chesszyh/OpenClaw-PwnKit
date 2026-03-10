@@ -4,9 +4,9 @@ import os
 from openai import OpenAI
 
 
-def _generate_article_content(client: OpenAI, topic: str) -> dict:
+def _generate_article_content(client: OpenAI, topic: str, model: str = "gpt-4-turbo") -> dict:
     response = client.chat.completions.create(
-        model="gpt-4-turbo",
+        model=model,
         messages=[
             {
                 "role": "system",
@@ -57,12 +57,14 @@ def generate_nginx_honeypot(
     output_path: str = "./honeypot/",
     topic: str | None = None,
     api_key: str | None = None,
+    base_url: str | None = None,
+    model: str = "gpt-4-turbo"
 ):
     os.makedirs(output_path, exist_ok=True)
 
     if topic and api_key:
-        client = OpenAI(api_key=api_key)
-        article = _generate_article_content(client, topic)
+        client = OpenAI(api_key=api_key, base_url=base_url)
+        article = _generate_article_content(client, topic, model=model)
         title = article.get("title", f"Guide to {topic}")
         meta_desc = article.get("meta_description", "")
         meta_keywords = article.get("meta_keywords", "")

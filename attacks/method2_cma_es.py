@@ -14,11 +14,12 @@ from transformers import AutoTokenizer, AutoModelForCausalLM
 from attacks.docs.SOUL_PROMPT import SOUL_PROMPT
 
 class CMAESTokenOptimizer:
-    def __init__(self, api_key: str, target_script: str, trigger_len: int = 10, pca_dims: int = 128):
-        self.client = OpenAI(api_key=api_key)
+    def __init__(self, api_key: str, target_script: str, trigger_len: int = 10, pca_dims: int = 128, base_url: str = None, model: str = "gpt-4-turbo"):
+        self.client = OpenAI(api_key=api_key, base_url=base_url)
         self.target_script = target_script
         self.trigger_len = trigger_len
         self.pca_dims = pca_dims
+        self.model_name = model
 
         print("[*] Loading surrogate model (microsoft/phi-2) for continuous embedding space... This may take a minute.")
         self.tokenizer = AutoTokenizer.from_pretrained("microsoft/phi-2")
@@ -142,7 +143,7 @@ class CMAESTokenOptimizer:
 
         try:
             response = self.client.chat.completions.create(
-                model="gpt-4-turbo",
+                model=self.model_name,
                 messages=[
                     {"role": "system", "content": f"You are OpenClaw Agent. Follow SOUL.md. {SOUL_PROMPT} Use bash tool."},
                     {"role": "user", "content": prompt}

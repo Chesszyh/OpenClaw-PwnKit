@@ -7,6 +7,8 @@ c2_server:
 openai:
   # 从环境变量 OPENAI_API_KEY 读取，或在此处直接填写
   api_key: "env" 
+  base_url: "http://localhost:8317/v1/"
+  model: "gpt-5.4" 
 
 optimization:
   surrogate_model: "microsoft/phi-2"  # keep for now, will be made configurable
